@@ -58,6 +58,9 @@ def ana_color(clear_name, ws_name, color):
 
     results_clear=[]
     results_ws=[]
+    results_peak_ws=[]
+    results_peak_clear=[]
+    
     print 'Starting clear fiber', clear
     for filename in os.listdir(clear):
         if filename.endswith(".CSV"):
@@ -65,6 +68,7 @@ def ana_color(clear_name, ws_name, color):
        
             t=[]
             U=[]
+            UMAX=-10000.
             with open(clear+filename, 'rb') as f:
                 reader = csv.reader(f)
                 for row in reader:
@@ -79,11 +83,13 @@ def ana_color(clear_name, ws_name, color):
             #Uaverage=sum(U[7000:len(U)])/(len(U)-7000)
             #print int(0.3*len(U))
             Uaverage=sum(U[0:int(0.3*len(U))])/(0.3*len(U))
-            print 'WS pedestrial: ', Uaverage
+            #print 'WS pedestrial: ', Uaverage
             #Uaverage=U[0]
             #Uaverage=0.
             offset(U,Uaverage)
-        
+            UMAX=max(U)
+
+            
             #print len(t)
             plt.plot(t, U)
             plt.xlabel('t [ns]'); plt.ylabel('U(t) [mV]')
@@ -92,8 +98,8 @@ def ana_color(clear_name, ws_name, color):
             integral=f.integral(min(t), max(t))
             #print integral
             results_clear.append(integral)
-
-
+            results_peak_clear.append(UMAX)
+            
     print 'Finished clear fiber, starting ws', ws
     for filename in os.listdir(ws):
         if filename.endswith(".CSV"):
@@ -115,11 +121,11 @@ def ana_color(clear_name, ws_name, color):
 
             #Uaverage=sum(U[7000:len(U)])/(len(U)-7000) 
             Uaverage=sum(U[0:int(0.3*len(U))])/(0.3*len(U))
-            print 'WS pedestrial: ', Uaverage
+            #print 'WS pedestrial: ', Uaverage
             #Uaverage=U[0]
             #Uaverage=0.
             offset(U,Uaverage)  
-
+            UMAX=max(U)
             plt.plot(t, U)
             plt.xlabel('t [ns]'); plt.ylabel('U(t) [mV]')
             #plt.show()
@@ -127,21 +133,32 @@ def ana_color(clear_name, ws_name, color):
             f = InterpolatedUnivariateSpline(t,U, k=1)
             integral=f.integral(min(t), max(t))
             results_ws.append(integral)
-
+            results_peak_ws.append(UMAX)
     print 'Finishe ws'
     Min=min(results_ws+results_clear)
     Max=max(results_ws+results_clear)
+    MinU=min(results_peak_ws+ results_peak_clear)
+    MaxU=max(results_peak_clear+ results_peak_ws)
 
-
-
+    print MinU, MaxU
     
     hist_clear=TH1D("clear", "clear", 200, Min, Max)
     hist_ws=TH1D("ws", "ws", 200, Min, Max)
+    
+    histU_clear=TH1D("clear", "clear", 200, MinU, MaxU)
+    histU_ws=TH1D("ws", "ws", 200, MinU, MaxU)
+    
+
     for c in results_clear:
         hist_clear.Fill(c)
     for w in results_ws:
         hist_ws.Fill(w)
+    for c in results_peak_clear:
+        histU_clear.Fill(c)
+    for w in results_peak_ws:
+        histU_ws.Fill(w)
 
+        
 
     mean_ws= hist_ws.GetMean()
     mean_clear= hist_clear.GetMean()
@@ -149,19 +166,38 @@ def ana_color(clear_name, ws_name, color):
 
     RMS_ws= hist_ws.GetRMS()
     RMS_clear= hist_clear.GetRMS()
-
+    
+    meanU_ws= histU_ws.GetMean()
+    meanU_clear= histU_clear.GetMean()
+    
+    RMSU_ws= histU_ws.GetRMS()
+    RMSU_clear= histU_clear.GetRMS()    
+    
 
     Min=max(Min, min(mean_ws-4.*RMS_ws, mean_clear -4.*RMS_clear))
     Max=min(Max, max(mean_ws+4.*RMS_ws, mean_clear +4.*RMS_clear))
 
+    MinU=max(MinU, min(meanU_ws-4.*RMSU_ws, meanU_clear -4.*RMSU_clear))
+    MaxU=min(MaxU, max(meanU_ws+4.*RMSU_ws, meanU_clear +4.*RMSU_clear))    
+    print meanU_ws, meanU_clear
+    print MinU, MaxU
+    
     hist_clear=TH1D("clear", "clear", 200, Min, Max)
     hist_ws=TH1D("ws", "ws", 200, Min, Max)
-
+    
+    histU_clear=TH1D("clear", "clear", 200, MinU, MaxU)
+    histU_ws=TH1D("ws", "ws", 200, MinU, MaxU)
+    
+  
+    
     for c in results_clear:
         hist_clear.Fill(c)
     for w in results_ws:
         hist_ws.Fill(w)
-
+    for c in results_peak_clear:
+        histU_clear.Fill(c)
+    for w in results_peak_ws:
+        histU_ws.Fill(w)
 
     
     hist_clear.SetLineColor(kBlue+3)
@@ -180,7 +216,22 @@ def ana_color(clear_name, ws_name, color):
     hist_clear.SetStats(False)
     hist_ws.SetStats(False) 
 
+    histU_clear.SetLineColor(kBlue+3)
+    histU_clear.SetLineWidth(3)
 
+    histU_ws.SetLineColor(kYellow+3)
+    histU_ws.SetLineWidth(3)
+
+    histU_clear.SetTitle("")
+    histU_clear.GetXaxis().SetTitle("[mV]")
+
+
+    histU_ws.SetTitle("")
+    histU_ws.GetXaxis().SetTitle("[mV]")
+
+    histU_clear.SetStats(False)
+    histU_ws.SetStats(False) 
+    
     hist_ws.DrawNormalized()
     hist_clear.DrawNormalized("SAME")
 
@@ -192,14 +243,24 @@ def ana_color(clear_name, ws_name, color):
 
     c1.SaveAs("results_"+color+".pdf")
 
+    histU_ws.DrawNormalized()
+    histU_clear.DrawNormalized("SAME")
+    
+    leg=TLegend(0.35, 0.5, 0.6,0.8)
+    leg.AddEntry(histU_clear, "Clear Fiber, "+color, "f")
+    leg.AddEntry(histU_ws, "WaveShifter, "+color, "f")     
 
+    leg.Draw()
+
+    c1.SaveAs("resultsU_"+color+".pdf")
 
 
 
 
     plt.savefig("pulse_"+color+".png")
     plt.savefig("pulse_"+color+".pdf")
-
+    plt.savefig("pulse_"+color+"self.eps")
+    
     plt.clf()
 
 def main(argv):
