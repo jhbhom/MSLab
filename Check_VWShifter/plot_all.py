@@ -58,9 +58,10 @@ def ana_color(clear_name, ws_name, color):
 
     results_clear=[]
     results_ws=[]
+    print 'Starting clear fiber', clear
     for filename in os.listdir(clear):
         if filename.endswith(".CSV"):
-            print filename
+            #print filename
        
             t=[]
             U=[]
@@ -73,25 +74,30 @@ def ana_color(clear_name, ws_name, color):
                  
                         t.append(tt)
                         U.append(uu)
-                
-                        
-            Uaverage=sum(U[0:int(0.3*len(U))])/(len(U)-0.3*len(U))
+                    except ValueError:
+                        aaa=1
+            #Uaverage=sum(U[7000:len(U)])/(len(U)-7000)
+            #print int(0.3*len(U))
+            Uaverage=sum(U[0:int(0.3*len(U))])/(0.3*len(U))
+            print 'WS pedestrial: ', Uaverage
+            #Uaverage=U[0]
+            #Uaverage=0.
             offset(U,Uaverage)
         
-            print len(t)
+            #print len(t)
             plt.plot(t, U)
             plt.xlabel('t [ns]'); plt.ylabel('U(t) [mV]')
             #plt.show()
             f = InterpolatedUnivariateSpline(t,U, k=1)
             integral=f.integral(min(t), max(t))
-            print integral
+            #print integral
             results_clear.append(integral)
 
 
-            
+    print 'Finished clear fiber, starting ws', ws
     for filename in os.listdir(ws):
         if filename.endswith(".CSV"):
-            print filename
+            #print filename
             #f = open(clear+filename)
             t=[]
             U=[]
@@ -105,10 +111,13 @@ def ana_color(clear_name, ws_name, color):
                         t.append(tt)
                         U.append(uu)
                     except ValueError:
-                        print "nooot"
+                        aaa=1
 
-            
-            Uaverage=sum(U[0:int(0.3*len(U))])/(len(U)-0.3*len(U))
+            #Uaverage=sum(U[7000:len(U)])/(len(U)-7000) 
+            Uaverage=sum(U[0:int(0.3*len(U))])/(0.3*len(U))
+            print 'WS pedestrial: ', Uaverage
+            #Uaverage=U[0]
+            #Uaverage=0.
             offset(U,Uaverage)  
 
             plt.plot(t, U)
@@ -117,18 +126,44 @@ def ana_color(clear_name, ws_name, color):
             #time.sleep(100.)
             f = InterpolatedUnivariateSpline(t,U, k=1)
             integral=f.integral(min(t), max(t))
-            print integral
             results_ws.append(integral)
 
+    print 'Finishe ws'
+    Min=min(results_ws+results_clear)
+    Max=max(results_ws+results_clear)
 
-    hist_clear=TH1D("clear", "clear", 200, 0.9*min(results_ws ), 1.1*max(results_clear))
-    hist_ws=TH1D("ws", "ws", 200, 0.9*min(results_ws), 1.1*max(results_clear))
+
+
+    
+    hist_clear=TH1D("clear", "clear", 200, Min, Max)
+    hist_ws=TH1D("ws", "ws", 200, Min, Max)
     for c in results_clear:
         hist_clear.Fill(c)
     for w in results_ws:
         hist_ws.Fill(w)
 
 
+    mean_ws= hist_ws.GetMean()
+    mean_clear= hist_clear.GetMean()
+    
+
+    RMS_ws= hist_ws.GetRMS()
+    RMS_clear= hist_clear.GetRMS()
+
+
+    Min=max(Min, min(mean_ws-4.*RMS_ws, mean_clear -4.*RMS_clear))
+    Max=min(Max, max(mean_ws+4.*RMS_ws, mean_clear +4.*RMS_clear))
+
+    hist_clear=TH1D("clear", "clear", 200, Min, Max)
+    hist_ws=TH1D("ws", "ws", 200, Min, Max)
+
+    for c in results_clear:
+        hist_clear.Fill(c)
+    for w in results_ws:
+        hist_ws.Fill(w)
+
+
+    
     hist_clear.SetLineColor(kBlue+3)
     hist_clear.SetLineWidth(3)
 
